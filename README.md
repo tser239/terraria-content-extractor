@@ -185,6 +185,9 @@ A headless mode is available for scripting and verification:
 | `--keep-premultiplied` | leave alpha premultiplied |
 | `--skip-existing` | do not overwrite existing files |
 | `--verbose` | log every file |
+| `--quiet` | log only warnings and errors |
+| `--jobs N` | worker threads (default: available CPUs) |
+| `--version`, `-V` | print the version and exit |
 
 `<input>` may be the Terraria root or the `Content` folder. Exit code is `0` on
 success and `1` if any file failed.

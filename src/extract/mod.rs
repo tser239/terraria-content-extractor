@@ -58,6 +58,8 @@ pub struct Options {
     pub unpremultiply: bool,
     pub skip_existing: bool,
     pub verbose: bool,
+    /// Number of decode threads; `None` uses the available parallelism.
+    pub jobs: Option<usize>,
 }
 
 impl Default for Options {
@@ -68,6 +70,7 @@ impl Default for Options {
             unpremultiply: true,
             skip_existing: true,
             verbose: false,
+            jobs: None,
         }
     }
 }
@@ -287,10 +290,11 @@ pub fn run_extraction(
         );
     }
 
-    let threads = std::thread::available_parallelism()
+    let default_threads = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
         .clamp(1, 16);
+    let threads = options.jobs.unwrap_or(default_threads).max(1);
 
     let process_xnbs = || {
         files.par_iter().for_each(|rel| {

@@ -27,6 +27,10 @@ fn main() -> eframe::Result<()> {
     if args.first().map(String::as_str) == Some("--cli") {
         std::process::exit(run_cli(&args[1..]));
     }
+    if matches!(args.first().map(String::as_str), Some("-V" | "--version")) {
+        print_version();
+        return Ok(());
+    }
     if matches!(args.first().map(String::as_str), Some("-h" | "--help")) {
         print_help();
         return Ok(());
@@ -128,6 +132,7 @@ fn shrink_icon(icon: eframe::egui::IconData) -> eframe::egui::IconData {
 fn run_cli(args: &[String]) -> i32 {
     let mut input: Option<PathBuf> = None;
     let mut output: Option<PathBuf> = None;
+    let mut quiet = false;
     let mut options = Options {
         skip_existing: false,
         ..Options::default()
@@ -141,6 +146,30 @@ fn run_cli(args: &[String]) -> i32 {
             "--keep-premultiplied" => options.unpremultiply = false,
             "--skip-existing" => options.skip_existing = true,
             "--verbose" => options.verbose = true,
+            "--quiet" => quiet = true,
+            "--jobs" => {
+                index += 1;
+                let Some(value) = args.get(index) else {
+                    eprintln!("--jobs requires a number");
+                    return 2;
+                };
+                let Some(jobs) = parse_jobs(value) else {
+                    eprintln!("invalid --jobs value: {value}");
+                    return 2;
+                };
+                options.jobs = Some(jobs);
+            }
+            value if let Some(raw) = value.strip_prefix("--jobs=") => {
+                let Some(jobs) = parse_jobs(raw) else {
+                    eprintln!("invalid --jobs value: {raw}");
+                    return 2;
+                };
+                options.jobs = Some(jobs);
+            }
+            "-V" | "--version" => {
+                print_version();
+                return 0;
+            }
             "-h" | "--help" => {
                 print_help();
                 return 0;
@@ -188,6 +217,16 @@ fn run_cli(args: &[String]) -> i32 {
     while let Ok(message) = receiver.recv() {
         match message {
             WorkerMsg::Log(line) => {
+                if quiet
+                    && matches!(
+                        line.level,
+                        extract::LogLevel::Info
+                            | extract::LogLevel::Success
+                            | extract::LogLevel::Verbose
+                    )
+                {
+                    continue;
+                }
                 let level = match line.level {
                     extract::LogLevel::Info => "info",
                     extract::LogLevel::Success => "ok",
@@ -219,6 +258,14 @@ fn run_cli(args: &[String]) -> i32 {
     }
 }
 
+fn print_version() {
+    println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+}
+
+fn parse_jobs(value: &str) -> Option<usize> {
+    value.parse::<usize>().ok().filter(|jobs| *jobs > 0)
+}
+
 fn print_help() {
     println!(
         "Terraria Content Extractor\n\
@@ -233,7 +280,10 @@ fn print_help() {
          \x20 --no-fonts             skip font atlas extraction\n\
          \x20 --keep-premultiplied   leave alpha premultiplied\n\
          \x20 --skip-existing        leave files that already exist untouched\n\
-         \x20 --verbose              log every file\n"
+         \x20 --verbose              log every file\n\
+         \x20 --quiet                log only warnings and errors (CLI)\n\
+         \x20 --jobs N               worker threads (default: available CPUs)\n\
+         \x20 --version, -V          print the version and exit\n"
     );
 }
 
@@ -248,5 +298,14 @@ mod tests {
             (icon.width * icon.height * 4) as usize,
             "icon must be RGBA8"
         );
+    }
+
+    #[test]
+    fn job_counts_must_be_positive() {
+        assert_eq!(super::parse_jobs("1"), Some(1));
+        assert_eq!(super::parse_jobs("32"), Some(32));
+        assert_eq!(super::parse_jobs("0"), None);
+        assert_eq!(super::parse_jobs("-1"), None);
+        assert_eq!(super::parse_jobs("many"), None);
     }
 }
