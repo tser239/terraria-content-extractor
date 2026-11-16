@@ -1,5 +1,9 @@
 # Terraria Content Extractor
 
+[![CI](https://github.com/tser239/terraria-content-extractor/actions/workflows/ci.yml/badge.svg)](https://github.com/tser239/terraria-content-extractor/actions/workflows/ci.yml)
+[![Release](https://github.com/tser239/terraria-content-extractor/actions/workflows/release.yml/badge.svg)](https://github.com/tser239/terraria-content-extractor/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Small Rust desktop app that converts the assets shipped in Terraria's `Content`
 folder into ordinary files:
 
@@ -192,6 +196,29 @@ Example:
   "$HOME/.local/share/Steam/steamapps/common/Terraria" \
   "$HOME/TerrariaExtracted"
 ```
+
+## Troubleshooting
+
+- **"Terraria was not found automatically"** - the input field starts empty.
+  Click **Detect**, or use **Browse…** to select the game root
+  (`…/common/Terraria`) or its `Content` folder.
+- **Linux: no folder picker opens** - the native dialog needs
+  `xdg-desktop-portal` and a portal backend, which GNOME and KDE install by
+  default.
+- **Linux/Wayland: the window behaves unusually** - the app runs through
+  XWayland by default. Set `TCX_NATIVE_WAYLAND=1` to use the native Wayland
+  backend instead.
+- **AppImage does not start** - some distributions ship without FUSE 2. Install
+  `libfuse2`, or run it with
+  `APPIMAGE_EXTRACT_AND_RUN=1 ./Terraria_Content_Extractor-*.AppImage`.
+- **macOS: "app is damaged" or Gatekeeper blocks it** - the bundle is ad-hoc
+  signed, not notarized. Right-click the app and choose **Open**, or clear the
+  quarantine flag:
+  `xattr -dr com.apple.quarantine "Terraria Content Extractor.app"`.
+- **Windows: SmartScreen warning** - the executable is unsigned. Choose
+  **More info → Run anyway** if you trust the download.
+- **Some files are skipped** - the three compiled shaders have no export format
+  and are reported as skipped; this is expected.
 
 ## Output details
 
