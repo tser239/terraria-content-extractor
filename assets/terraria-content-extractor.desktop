@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Terraria Content Extractor
+Comment=Extract Terraria XNB/XWB assets into PNG, WAV and JSON
+Exec=terraria-content-extractor
+Icon=terraria-content-extractor
+Terminal=false
+Categories=Utility;
+Keywords=Terraria;XNB;XWB;extract;textures;sounds;
+StartupWMClass=terraria-content-extractor
