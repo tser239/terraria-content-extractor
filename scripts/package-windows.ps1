@@ -68,6 +68,6 @@ $hash = (Get-FileHash $Zip -Algorithm SHA256).Hash.ToLower()
 "$hash  $(Split-Path -Leaf $Zip)" | Set-Content -Encoding ascii $Checksums
 
 Write-Host ""
-Write-Host "Created in $Dist:"
+Write-Host "Created in ${Dist}:"
 Write-Host "  $(Split-Path -Leaf $Zip)"
 Write-Host "  $(Split-Path -Leaf $Checksums)"
