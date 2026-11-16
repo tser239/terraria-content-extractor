@@ -71,7 +71,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Cache appimagetool
         if: runner.os == 'Linux'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/terraria-content-extractor
           key: appimagetool-1.9.1
