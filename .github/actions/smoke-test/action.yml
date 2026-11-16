@@ -1,0 +1,41 @@
+name: Smoke test packages
+description: Run --help from the packaged binaries in dist/
+
+runs:
+  using: composite
+  steps:
+    - name: Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        tmp="$(mktemp -d)"
+        tar -xzf dist/*-linux-gnu.tar.gz -C "$tmp"
+        "$tmp"/*/terraria-content-extractor --help >/dev/null
+        dpkg-deb -x dist/*.deb "$tmp/deb"
+        "$tmp/deb/usr/bin/terraria-content-extractor" --help >/dev/null
+        APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 dist/*.AppImage --help >/dev/null
+
+    - name: Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $tmp = Join-Path $env:RUNNER_TEMP "smoke"
+        Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+        $zip = Get-ChildItem dist/*.zip | Select-Object -First 1
+        Expand-Archive -Path $zip -DestinationPath $tmp
+        & (Join-Path $tmp "terraria-content-extractor.exe") --help
+        if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
+
+    - name: macOS
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        set -euo pipefail
+        tmp="$(mktemp -d)"
+        ditto -x -k dist/*.zip "$tmp"
+        binary="$tmp/Terraria Content Extractor.app/Contents/MacOS/terraria-content-extractor"
+        "$binary" --help >/dev/null
+        archs="$(lipo -archs "$binary")"
+        [[ "$archs" == *x86_64* && "$archs" == *arm64* ]]
+        codesign --verify --deep --strict "$tmp/Terraria Content Extractor.app"
