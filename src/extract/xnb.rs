@@ -36,6 +36,12 @@ pub fn decompress(raw: &[u8]) -> Result<Vec<u8>> {
     }
 
     let expected = u32::from_le_bytes(raw[10..14].try_into().unwrap()) as usize;
+    const MAX_DECOMPRESSED_BYTES: usize = 512 * 1024 * 1024;
+    if expected > MAX_DECOMPRESSED_BYTES {
+        bail!(
+            "declared decompressed size {expected} exceeds the {MAX_DECOMPRESSED_BYTES} byte limit"
+        );
+    }
     let target = expected
         .checked_add(10)
         .context("decompressed size overflows")?;
@@ -173,6 +179,26 @@ struct Reader<'a> {
 impl<'a> Reader<'a> {
     fn remaining(&self) -> usize {
         self.data.len().saturating_sub(self.position)
+    }
+
+    /// Validate a list count before reserving memory for it.
+    ///
+    /// Each item needs at least `item_size` bytes, so a count larger than the
+    /// remaining data can hold is malformed; this prevents huge allocations
+    /// from a corrupt header.
+    fn list_len(&self, count: i32, item_size: usize) -> Result<usize> {
+        if count < 0 {
+            bail!("negative list count {count}");
+        }
+        let count = count as usize;
+        let available = self.remaining() / item_size.max(1);
+        if count > available {
+            bail!(
+                "list count {count} exceeds the {} remaining bytes",
+                self.remaining()
+            );
+        }
+        Ok(count)
     }
 
     fn u8(&mut self) -> Result<u8> {
@@ -533,10 +559,8 @@ fn read_texture(reader: &mut Reader) -> Result<Texture> {
 fn read_rect_list(reader: &mut Reader) -> Result<Vec<[i32; 4]>> {
     let _type_id = reader.seven_bit()?;
     let count = reader.i32()?;
-    if count < 0 {
-        bail!("negative list count {count}");
-    }
-    let mut items = Vec::with_capacity(count as usize);
+    let count = reader.list_len(count, 16)?;
+    let mut items = Vec::with_capacity(count);
     for _ in 0..count {
         items.push([reader.i32()?, reader.i32()?, reader.i32()?, reader.i32()?]);
     }
@@ -546,10 +570,8 @@ fn read_rect_list(reader: &mut Reader) -> Result<Vec<[i32; 4]>> {
 fn read_vector3_list(reader: &mut Reader) -> Result<Vec<[f32; 3]>> {
     let _type_id = reader.seven_bit()?;
     let count = reader.i32()?;
-    if count < 0 {
-        bail!("negative list count {count}");
-    }
-    let mut items = Vec::with_capacity(count as usize);
+    let count = reader.list_len(count, 12)?;
+    let mut items = Vec::with_capacity(count);
     for _ in 0..count {
         items.push([reader.f32()?, reader.f32()?, reader.f32()?]);
     }
@@ -559,10 +581,8 @@ fn read_vector3_list(reader: &mut Reader) -> Result<Vec<[f32; 3]>> {
 fn read_char_list(reader: &mut Reader) -> Result<Vec<char>> {
     let _type_id = reader.seven_bit()?;
     let count = reader.i32()?;
-    if count < 0 {
-        bail!("negative list count {count}");
-    }
-    let mut items = Vec::with_capacity(count as usize);
+    let count = reader.list_len(count, 1)?;
+    let mut items = Vec::with_capacity(count);
     for _ in 0..count {
         items.push(reader.char()?);
     }
@@ -659,4 +679,53 @@ fn write_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<u64> {
         let _ = std::fs::remove_file(&partial);
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reader(data: &[u8]) -> Reader<'_> {
+        Reader { data, position: 0 }
+    }
+
+    #[test]
+    fn huge_list_counts_are_rejected() {
+        // Type id 0, then a count of 2_000_000_000 with no data behind it.
+        let data = [0u8, 0x00, 0x94, 0x35, 0x77];
+        assert!(read_rect_list(&mut reader(&data)).is_err());
+        assert!(read_vector3_list(&mut reader(&data)).is_err());
+        assert!(read_char_list(&mut reader(&data)).is_err());
+    }
+
+    #[test]
+    fn valid_rect_list_still_parses() {
+        let mut data = vec![0u8, 1, 0, 0, 0];
+        for value in [7i32, 8, 9, 10] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        assert_eq!(
+            read_rect_list(&mut reader(&data)).unwrap(),
+            vec![[7, 8, 9, 10]]
+        );
+    }
+
+    #[test]
+    fn implausible_decompressed_size_is_rejected() {
+        let mut raw = vec![0u8; 14];
+        raw[..3].copy_from_slice(b"XNB");
+        raw[5] = 0x80; // LZX compressed
+        raw[10..14].copy_from_slice(&u32::MAX.to_le_bytes());
+
+        assert!(decompress(&raw).is_err());
+    }
+
+    #[test]
+    fn oversized_textures_are_rejected() {
+        let mut data = Vec::new();
+        for value in [0i32, 20_000, 20_000, 1] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        assert!(read_texture(&mut reader(&data)).is_err());
+    }
 }
