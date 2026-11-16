@@ -108,8 +108,10 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           mapfile -d '' files < <(find dist -maxdepth 1 -type f -print0)
-          if ! gh release create "$tag" "${files[@]}" \
-              --draft --title "$tag" --generate-notes; then
+          if gh release view "$tag" >/dev/null 2>&1; then
             echo "release already exists; uploading artifacts instead"
             gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" \
+              --draft --title "$tag" --generate-notes
           fi
