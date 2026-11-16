@@ -12,6 +12,45 @@ use anyhow::{Context, Result, bail};
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
+/// Path used while writing `path`, in the same directory so the final rename
+/// stays on one filesystem.
+pub(crate) fn partial_path(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".part");
+    path.with_file_name(name)
+}
+
+/// Write `bytes` to `path` atomically.
+///
+/// A crash or cancellation leaves either the previous file or no file at all,
+/// never a truncated one, which keeps `--skip-existing` resume-safe.
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    let partial = partial_path(path);
+    let result = (|| -> Result<()> {
+        std::fs::write(&partial, bytes)
+            .with_context(|| format!("writing {}", partial.display()))?;
+        commit_partial(&partial, path)
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&partial);
+    }
+    result
+}
+
+/// Move a fully written partial file into place.
+pub(crate) fn commit_partial(partial: &Path, target: &Path) -> Result<()> {
+    #[cfg(windows)]
+    if target.exists() {
+        // std::fs::rename cannot replace an existing file on Windows.
+        std::fs::remove_file(target)
+            .with_context(|| format!("removing old {}", target.display()))?;
+    }
+
+    std::fs::rename(partial, target)
+        .with_context(|| format!("renaming {} to {}", partial.display(), target.display()))
+}
+
 #[derive(Clone, Debug)]
 pub struct Options {
     pub extract_music: bool,
@@ -456,4 +495,43 @@ pub(crate) fn with_extension(rel: &Path, ext: &str) -> PathBuf {
 /// Checked helper for reading a whole file with a useful error message.
 pub(crate) fn read_file(path: &Path) -> Result<Vec<u8>> {
     std::fs::read(path).with_context(|| format!("reading {}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "terraria-content-extractor-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create scratch dir");
+        dir
+    }
+
+    #[test]
+    fn atomic_write_replaces_existing_file() {
+        let dir = scratch_dir("atomic-replace");
+        let target = dir.join("image.png");
+        std::fs::write(&target, b"old").unwrap();
+
+        write_atomic(&target, b"new").unwrap();
+
+        assert_eq!(std::fs::read(&target).unwrap(), b"new");
+        assert!(!partial_path(&target).exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn atomic_write_cleans_up_after_failure() {
+        let dir = scratch_dir("atomic-failure");
+        let target = dir.join("target");
+        std::fs::create_dir(&target).unwrap();
+
+        assert!(write_atomic(&target, b"data").is_err());
+        assert!(!partial_path(&target).exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

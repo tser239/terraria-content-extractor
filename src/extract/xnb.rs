@@ -356,7 +356,7 @@ fn extract_sound(
     }
 
     let wav = super::wav::pcm(&format, data);
-    std::fs::write(&output, &wav).with_context(|| format!("writing {}", output.display()))?;
+    super::write_atomic(&output, &wav)?;
 
     Ok(Outcome::Sound {
         bytes: wav.len() as u64,
@@ -484,8 +484,7 @@ fn extract_font(
     });
 
     let encoded = serde_json::to_vec_pretty(&document).context("serialising font JSON")?;
-    std::fs::write(&json_path, &encoded)
-        .with_context(|| format!("writing {}", json_path.display()))?;
+    super::write_atomic(&json_path, &encoded)?;
     bytes_written += encoded.len() as u64;
 
     Ok(Outcome::Font {
@@ -636,17 +635,28 @@ fn write_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<u64> {
         );
     }
 
-    let file = File::create(path).with_context(|| format!("creating {}", path.display()))?;
-    let mut writer = BufWriter::new(file);
-    image::codecs::png::PngEncoder::new(&mut writer)
-        .write_image(rgba, width, height, ExtendedColorType::Rgba8)
-        .with_context(|| format!("encoding {}", path.display()))?;
-    writer
-        .flush()
-        .with_context(|| format!("flushing {}", path.display()))?;
-    drop(writer);
+    let partial = super::partial_path(path);
+    let result = (|| -> Result<u64> {
+        let file =
+            File::create(&partial).with_context(|| format!("creating {}", partial.display()))?;
+        let mut writer = BufWriter::new(file);
+        image::codecs::png::PngEncoder::new(&mut writer)
+            .write_image(rgba, width, height, ExtendedColorType::Rgba8)
+            .with_context(|| format!("encoding {}", partial.display()))?;
+        writer
+            .flush()
+            .with_context(|| format!("flushing {}", partial.display()))?;
+        drop(writer);
 
-    Ok(std::fs::metadata(path)
-        .with_context(|| format!("reading metadata for {}", path.display()))?
-        .len())
+        super::commit_partial(&partial, path)?;
+
+        Ok(std::fs::metadata(path)
+            .with_context(|| format!("reading metadata for {}", path.display()))?
+            .len())
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&partial);
+    }
+    result
 }

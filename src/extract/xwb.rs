@@ -270,7 +270,7 @@ impl WaveBank {
             &data,
         );
 
-        std::fs::write(output, &wav).with_context(|| format!("writing {}", output.display()))?;
+        super::write_atomic(output, &wav)?;
 
         Ok((wav.len() as u64, sample_rate, channels, entry.duration))
     }
