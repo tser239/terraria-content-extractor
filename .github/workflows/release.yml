@@ -78,7 +78,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: dist/
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS-*
           if-no-files-found: error
 
   release:
@@ -105,8 +107,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           tag="$GITHUB_REF_NAME"
-          if ! gh release create "$tag" dist/* \
+          mapfile -d '' files < <(find dist -maxdepth 1 -type f -print0)
+          if ! gh release create "$tag" "${files[@]}" \
               --draft --title "$tag" --generate-notes; then
             echo "release already exists; uploading artifacts instead"
-            gh release upload "$tag" dist/* --clobber
+            gh release upload "$tag" "${files[@]}" --clobber
           fi
