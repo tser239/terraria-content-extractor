@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
           - os: windows-latest
             artifact: windows
             command: pwsh -File scripts/package-windows.ps1
-          - os: macos-14
+          - os: macos-latest
             artifact: macos
             command: ./scripts/package-macos.sh
     runs-on: ${{ matrix.os }}
