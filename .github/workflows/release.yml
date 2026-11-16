@@ -45,7 +45,7 @@ jobs:
       - name: Build Linux packages
         run: ./scripts/package-linux.sh --native
       - uses: ./.github/actions/smoke-test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux
           path: dist/
@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: pwsh -File scripts/package-windows.ps1
       - uses: ./.github/actions/smoke-test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: dist/
@@ -82,7 +82,7 @@ jobs:
       - name: Build universal macOS app
         run: ./scripts/package-macos.sh
       - uses: ./.github/actions/smoke-test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: |
