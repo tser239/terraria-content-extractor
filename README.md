@@ -18,6 +18,21 @@ Everything is decoded in pure Rust - no MonoGame runtime, no `xnbcli`, no
 `ffmpeg` - using `lzxd` for the LZX-compressed XNB container,
 `texture2ddecoder` for the DXT3 font atlases, and `image` for PNG encoding.
 
+![Terraria Content Extractor](docs/screenshot.png)
+
+## Usage
+
+Ready-to-download builds are on GitHub under
+[Releases](https://github.com/tser239/terraria-content-extractor/releases).
+
+1. Start the app (download a release, or run `cargo run --release`).
+2. Confirm the auto-detected Terraria folder; use **Detect** or **Browse…** if it
+   is wrong or empty.
+3. Choose an output folder with **Browse…**.
+4. Click **Start extraction** and follow the progress bar and log.
+
+See [GUI](#gui) for the options and [CLI](#cli) for headless use.
+
 ## Requirements
 
 - Rust 1.95 or newer (eframe 0.37)
