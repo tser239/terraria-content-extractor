@@ -1,6 +1,6 @@
 [package]
 name = "terraria-content-extractor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.95"
 description = "Extract Terraria's XNB/XWB assets into PNG, WAV and JSON"
