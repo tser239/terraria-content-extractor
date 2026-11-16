@@ -18,7 +18,7 @@ jobs:
   version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check tag against Cargo.toml
         run: |
           version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
@@ -33,7 +33,7 @@ jobs:
     needs: version
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
@@ -55,7 +55,7 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
@@ -74,7 +74,7 @@ jobs:
     needs: version
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
